@@ -1,0 +1,39 @@
+{
+  "name": "beauhurst_blog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@nuxt/a11y": "^1.0.0-alpha.1",
+    "@nuxt/content": "^3.16.1",
+    "@nuxt/ui": "^4.12.0",
+    "@tiptap/core": "^3.32.2",
+    "@tiptap/extension-bubble-menu": "^3.32.2",
+    "@tiptap/extension-code": "^3.32.2",
+    "@tiptap/extension-collaboration": "^3.32.2",
+    "@tiptap/extension-drag-handle": "^3.32.2",
+    "@tiptap/extension-drag-handle-vue-3": "^3.32.2",
+    "@tiptap/extension-floating-menu": "^3.32.2",
+    "@tiptap/extension-horizontal-rule": "^3.32.2",
+    "@tiptap/extension-image": "^3.32.2",
+    "@tiptap/extension-mention": "^3.32.2",
+    "@tiptap/extension-node-range": "^3.32.2",
+    "@tiptap/extension-placeholder": "^3.32.2",
+    "@tiptap/markdown": "^3.32.2",
+    "@tiptap/pm": "^3.32.2",
+    "@tiptap/starter-kit": "^3.32.2",
+    "@tiptap/suggestion": "^3.32.2",
+    "@tiptap/vue-3": "^3.32.2",
+    "better-sqlite3": "^13.0.3",
+    "nuxt": "^4.6.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  }
+}
