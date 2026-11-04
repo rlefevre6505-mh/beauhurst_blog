@@ -1,75 +1,17 @@
-# Nuxt Content Starter
+# Dataset-to-blog
 
-Look at the [Nuxt Content documentation](https://content.nuxt.com) to learn more.
+A Nuxt application that turns a company CSV into a server-rendered, SEO-ready ranking article. The included home page uses `content/fintech_companies_seed.csv`; use `/create` to upload another dataset.
 
 ## Setup
 
-Make sure to install dependencies:
+Install dependencies with `npm install`.
 
-```bash
-# npm
-npm install
+## Development
 
-# pnpm
-pnpm install
+Run `npm run dev` and open `http://localhost:3000`. To generate AI-written article copy, set `GEMINI_API_KEY` in `.env.local` or provide `NUXT_GEMINI_API_KEY` in the environment (`GEMINI-KEY` is also supported for compatibility). The default model is `gemini-3.5-flash-lite`; `NUXT_GEMINI_MODEL` can override it. The API key is used only by the server and is never returned to the browser. Without a key, the app creates concise, factual copy directly from computed dataset statistics.
 
-# yarn
-yarn install
+CSV files need a `Company` (or `Name`) column and a `Total Raised` (or `Amount Raised`) column. Optional columns include `Region`, `Stage`, `Employees`, `Description`, `Website` and `Industries`. Fundraising amounts must use one currency per file; `£`, `$`, `€` and unmarked numeric amounts are supported. Uploads are limited to 2 MB and 5,000 companies.
 
-# bun
-bun install
-```
+Generated dataset records are stored as JSON under `.data/blogs` and served at `/blog/<dataset-name>-fundraising`. This file-based storage suits a single Node server/demo; production deployments with ephemeral or multiple instances should replace it with shared persistent storage and add authentication, upload quotas and moderation.
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Build and preview with `npm run build` and `npm run preview`.
