@@ -30,14 +30,16 @@ function validateCopy(value: unknown): GeneratedCopy {
 
 async function generateCopy(
   event: H3Event,
+  blogTitle: string,
   industry: string,
+  industries: string[],
   currency: string | null,
   companies: ReturnType<typeof parseCompanyCsv>['companies'],
 ) {
   const config = useRuntimeConfig(event)
   const stats = summarizeCompanies(companies)
   const apiKey = getGeminiApiKey(config)
-  if (!apiKey) return createFallbackCopy(industry, stats, currency)
+  if (!apiKey) return { ...createFallbackCopy(industry, stats, currency), title: blogTitle }
 
   const model = String(config.geminiModel)
   let response: {
@@ -59,12 +61,14 @@ async function generateCopy(
           role: 'user',
           parts: [{
             text: JSON.stringify({
+              title: blogTitle,
               industry,
+              csvIndustries: industries,
               currency: currency ?? 'not specified',
               statistics: stats,
               leadingCompanies: getCompanySummary(companies),
               requirements: {
-                title: `SEO-friendly title, maximum 120 characters, about the ${industry} fundraising ranking`,
+                title: 'Use the supplied title exactly.',
                 introduction: 'A readable introduction of 2-3 sentences, grounded in the supplied statistics.',
                 metaDescription: 'Accurate search snippet, maximum 160 characters.',
                 insights: '3-5 factual insights grounded in the supplied statistics.',
@@ -124,7 +128,7 @@ async function generateCopy(
   const content = response.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('').trim()
   if (!content) throw createError({ statusCode: 502, statusMessage: 'Gemini returned no blog copy.' })
   try {
-    return { ...validateCopy(JSON.parse(content)), generatedByAi: true }
+    return { ...validateCopy(JSON.parse(content)), title: blogTitle, generatedByAi: true }
   } catch (error) {
     console.error('Invalid blog copy returned by Gemini', error instanceof Error ? error.name : 'Unknown error')
     throw createError({ statusCode: 502, statusMessage: 'Gemini returned invalid blog content.' })
@@ -139,6 +143,9 @@ export default defineEventHandler(async (event) => {
   if (file.filename && !file.filename.toLowerCase().endsWith('.csv')) {
     throw createError({ statusCode: 400, statusMessage: 'Upload a .csv file.' })
   }
+  const blogTitle = parts?.find(part => part.name === 'title')?.data.toString('utf8').trim()
+  if (!blogTitle) throw createError({ statusCode: 400, statusMessage: 'Enter a blog title.' })
+  if (blogTitle.length > 120) throw createError({ statusCode: 400, statusMessage: 'Blog titles must be 120 characters or fewer.' })
 
   const csv = file.data.toString('utf8')
   let parsed: ReturnType<typeof parseCompanyCsv>
@@ -150,9 +157,18 @@ export default defineEventHandler(async (event) => {
       statusMessage: error instanceof Error ? error.message : 'The CSV could not be read.',
     })
   }
-  const industryPart = parts?.find(part => part.name === 'industry')?.data.toString('utf8').trim()
-  const industry = industryPart || inferIndustry(file.filename || 'company')
-  const copy = await generateCopy(event, industry, parsed.currency, parsed.companies)
+  const industryCounts = new Map<string, number>()
+  for (const company of parsed.companies) {
+    for (const value of company.industries) {
+      industryCounts.set(value, (industryCounts.get(value) ?? 0) + 1)
+    }
+  }
+  const industries = [...industryCounts.entries()]
+    .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
+    .slice(0, 12)
+    .map(([value]) => value)
+  const industry = industries[0] || inferIndustry(file.filename || 'company')
+  const copy = await generateCopy(event, blogTitle, industry, industries, parsed.currency, parsed.companies)
   try {
     const blog = await createBlogFromCsv({ filename: file.filename || 'dataset.csv', csv, copy, industry })
     return { slug: blog.slug, title: blog.copy.title, url: `/blog/${blog.slug}`, generatedByAi: blog.copy.generatedByAi }
