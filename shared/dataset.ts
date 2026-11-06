@@ -1,3 +1,5 @@
+import Papa from 'papaparse'
+
 export interface Company {
   name: string
   region: string
@@ -50,44 +52,11 @@ const aliases: Record<string, string[]> = {
   industries: ['industries', 'industry', 'sectors', 'sector'],
 }
 
-function parseRows(csv: string): string[][] {
-  const rows: string[][] = []
-  let row: string[] = []
-  let cell = ''
-  let quoted = false
-
-  for (let i = 0; i < csv.length; i++) {
-    const character = csv[i]
-    if (quoted) {
-      if (character === '"' && csv[i + 1] === '"') {
-        cell += '"'
-        i++
-      } else if (character === '"') {
-        quoted = false
-      } else {
-        cell += character
-      }
-    } else if (character === '"' && cell.length === 0) {
-      quoted = true
-    } else if (character === ',') {
-      row.push(cell.trim())
-      cell = ''
-    } else if (character === '\n' || character === '\r') {
-      if (character === '\r' && csv[i + 1] === '\n') i++
-      row.push(cell.trim())
-      if (row.some(value => value.length > 0)) rows.push(row)
-      if (rows.length > 5001) throw new Error('CSV can contain no more than 5,000 companies.')
-      row = []
-      cell = ''
-    } else {
-      cell += character
-    }
-  }
-
-  if (quoted) throw new Error('The CSV contains an unclosed quoted field.')
-  row.push(cell.trim())
-  if (row.some(value => value.length > 0)) rows.push(row)
-  return rows
+function throwCsvIssues(issues: string[]): never {
+  const displayedIssues = issues.slice(0, 8).join(' ')
+  const remainingCount = issues.length - 8
+  const remainingMessage = remainingCount > 0 ? ` And ${remainingCount} more issue(s).` : ''
+  throw new Error(`The CSV has problems that need fixing: ${displayedIssues}${remainingMessage}`)
 }
 
 function normalizeHeader(value: string): string {
@@ -114,10 +83,32 @@ function parseAmount(value: string): { amount: number, currency: string | null }
 }
 
 export function parseCompanyCsv(csv: string): { companies: Company[], currency: string | null } {
-  const rows = parseRows(csv)
+  const result = Papa.parse<string[]>(csv.replace(/^\uFEFF/, ''), {
+    delimiter: ',',
+    skipEmptyLines: 'greedy',
+    transform: value => value.trim(),
+  })
+  if (result.errors.length) {
+    throwCsvIssues(result.errors.map((error) =>
+      typeof error.row === 'number'
+        ? `Could not parse CSV record ${error.row + 1}: ${error.message}`
+        : `Could not parse the CSV format: ${error.message}`,
+    ))
+  }
+
+  const rows = result.data
   if (rows.length < 2) throw new Error('The CSV must include a header and at least one company.')
+  if (rows.length > 5001) throw new Error('CSV can contain no more than 5,000 companies.')
 
   const headers = rows[0] ?? []
+  const issues: string[] = []
+  for (const [index, cells] of rows.slice(1).entries()) {
+    if (cells.length !== headers.length) {
+      issues.push(`Row ${index + 2} has ${cells.length} columns; expected ${headers.length}.`)
+    }
+  }
+  if (issues.length) throwCsvIssues(issues)
+
   const columns = {
     name: findColumn(headers, 'name'),
     totalRaised: findColumn(headers, 'totalRaised'),
@@ -133,19 +124,32 @@ export function parseCompanyCsv(csv: string): { companies: Company[], currency: 
   }
 
   let currency: string | null = null
-  const companies = rows.slice(1).map((cells, index) => {
-    const name = cells[columns.name]?.trim()
-    if (!name) throw new Error(`Row ${index + 2} is missing a company name.`)
-    const parsedAmount = parseAmount(cells[columns.totalRaised] ?? '')
+  const companies: Company[] = []
+  for (const [index, cells] of rows.slice(1).entries()) {
+    const rowNumber = index + 2
+    const name = cells[columns.name] ?? ''
+    const amount = cells[columns.totalRaised] ?? ''
+    if (!name) issues.push(`Row ${rowNumber} is missing a company name.`)
+    if (!amount) issues.push(`Row ${rowNumber} is missing a total raised amount.`)
+    if (!name || !amount) continue
+
+    let parsedAmount: ReturnType<typeof parseAmount>
+    try {
+      parsedAmount = parseAmount(amount)
+    } catch (error) {
+      issues.push(`Row ${rowNumber}: ${error instanceof Error ? error.message : 'Invalid fundraising amount.'}`)
+      continue
+    }
     if (parsedAmount.currency) {
       if (currency && currency !== parsedAmount.currency) {
-        throw new Error('Use one currency throughout the fundraising column.')
+        issues.push(`Row ${rowNumber} uses a different currency from the other fundraising amounts.`)
+        continue
       }
       currency = parsedAmount.currency
     }
 
-    const value = (column: number) => column < 0 ? '' : (cells[column] ?? '').trim()
-    return {
+    const value = (column: number) => column < 0 ? '' : (cells[column] ?? '')
+    companies.push({
       name,
       region: value(columns.region) || 'Not specified',
       stage: value(columns.stage) || 'Not specified',
@@ -154,10 +158,10 @@ export function parseCompanyCsv(csv: string): { companies: Company[], currency: 
       description: value(columns.description),
       website: value(columns.website),
       industries: value(columns.industries).split(/\s*;\s*/).filter(Boolean),
-    }
-  })
+    })
+  }
 
-  if (companies.length > 5000) throw new Error('CSV can contain no more than 5,000 companies.')
+  if (issues.length) throwCsvIssues(issues)
   companies.sort((a, b) => b.totalRaised - a.totalRaised)
   return { companies, currency }
 }
