@@ -14,4 +14,6 @@ CSV files need a `Company` (or `Name`) column and a `Total Raised` (or `Amount R
 
 Generated dataset records are stored as JSON under `.data/blogs` and served at `/blog/<dataset-name>-fundraising`. This file-based storage suits a single Node server/demo; production deployments with ephemeral or multiple instances should replace it with shared persistent storage and add authentication, upload quotas and moderation.
 
+Failed upload records, including CSV contents (up to the 2 MB upload limit), timestamps and error messages, are stored in `.data/upload-errors.jsonl`. The log rotates at 50 MB, keeping the newest records. These records are viewable without a password at `/admin/upload-errors` and through its API, so do not upload confidential or personal data. This file-based storage suits a single Node server/demo; production deployments with ephemeral or multiple instances should use shared persistent storage.
+
 Build and preview with `npm run build` and `npm run preview`.
