@@ -1,6 +1,7 @@
 import { createFallbackCopy, parseCompanyCsv, summarizeCompanies } from '#shared/dataset'
 import { createBlogFromCsv, getCompanySummary, inferIndustry } from '../../utils/blogs'
 import { getGeminiApiKey } from '../../utils/gemini'
+import { recordUploadError } from '../../utils/upload-error-logs'
 import type { H3Event } from 'h3'
 
 const maxUploadBytes = 2 * 1024 * 1024
@@ -136,45 +137,60 @@ async function generateCopy(
 }
 
 export default defineEventHandler(async (event) => {
-  const parts = await readMultipartFormData(event)
-  const file = parts?.find(part => part.name === 'file')
-  if (!file?.data?.length) throw createError({ statusCode: 400, statusMessage: 'Choose a CSV file to upload.' })
-  if (file.data.length > maxUploadBytes) throw createError({ statusCode: 413, statusMessage: 'CSV uploads must be 2 MB or smaller.' })
-  if (file.filename && !file.filename.toLowerCase().endsWith('.csv')) {
-    throw createError({ statusCode: 400, statusMessage: 'Upload a .csv file.' })
-  }
-  const blogTitle = parts?.find(part => part.name === 'title')?.data.toString('utf8').trim()
-  if (!blogTitle) throw createError({ statusCode: 400, statusMessage: 'Enter a blog title.' })
-  if (blogTitle.length > 120) throw createError({ statusCode: 400, statusMessage: 'Blog titles must be 120 characters or fewer.' })
-
-  const csv = file.data.toString('utf8')
-  let parsed: ReturnType<typeof parseCompanyCsv>
+  let uploadedFile: Buffer | null = null
   try {
-    parsed = parseCompanyCsv(csv)
-  } catch (error) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: error instanceof Error ? error.message : 'The CSV could not be read.',
-    })
-  }
-  const industryCounts = new Map<string, number>()
-  for (const company of parsed.companies) {
-    for (const value of company.industries) {
-      industryCounts.set(value, (industryCounts.get(value) ?? 0) + 1)
+    const parts = await readMultipartFormData(event)
+    const file = parts?.find(part => part.name === 'file')
+    uploadedFile = file?.data ?? null
+    if (!file?.data?.length) throw createError({ statusCode: 400, statusMessage: 'Choose a CSV file to upload.' })
+    if (file.data.length > maxUploadBytes) throw createError({ statusCode: 413, statusMessage: 'CSV uploads must be 2 MB or smaller.' })
+    if (file.filename && !file.filename.toLowerCase().endsWith('.csv')) {
+      throw createError({ statusCode: 400, statusMessage: 'Upload a .csv file.' })
     }
-  }
-  const industries = [...industryCounts.entries()]
-    .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
-    .slice(0, 12)
-    .map(([value]) => value)
-  const industry = industries[0] || inferIndustry(file.filename || 'company')
-  const copy = await generateCopy(event, blogTitle, industry, industries, parsed.currency, parsed.companies)
-  try {
+
+    const blogTitle = parts?.find(part => part.name === 'title')?.data.toString('utf8').trim()
+    if (!blogTitle) throw createError({ statusCode: 400, statusMessage: 'Enter a blog title.' })
+    if (blogTitle.length > 120) throw createError({ statusCode: 400, statusMessage: 'Blog titles must be 120 characters or fewer.' })
+
+    const csv = file.data.toString('utf8')
+    let parsed: ReturnType<typeof parseCompanyCsv>
+    try {
+      parsed = parseCompanyCsv(csv)
+    } catch (error) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error instanceof Error ? error.message : 'The CSV could not be read.',
+      })
+    }
+    const industryCounts = new Map<string, number>()
+    for (const company of parsed.companies) {
+      for (const value of company.industries) {
+        industryCounts.set(value, (industryCounts.get(value) ?? 0) + 1)
+      }
+    }
+    const industries = [...industryCounts.entries()]
+      .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
+      .slice(0, 12)
+      .map(([value]) => value)
+    const industry = industries[0] || inferIndustry(file.filename || 'company')
+    const copy = await generateCopy(event, blogTitle, industry, industries, parsed.currency, parsed.companies)
     const blog = await createBlogFromCsv({ filename: file.filename || 'dataset.csv', csv, copy, industry })
     return { slug: blog.slug, title: blog.copy.title, url: `/blog/${blog.slug}`, generatedByAi: blog.copy.generatedByAi }
   } catch (error) {
+    const errorMessages = error && typeof error === 'object'
+      ? [
+          'statusMessage' in error && typeof error.statusMessage === 'string' ? error.statusMessage : '',
+          'message' in error && typeof error.message === 'string' ? error.message : '',
+        ].filter(Boolean)
+      : [String(error)]
+    try {
+      await recordUploadError(uploadedFile, [...new Set(errorMessages.length ? errorMessages : ['Unknown upload error.'])], maxUploadBytes)
+    } catch (loggingError) {
+      console.error('Could not record upload error', loggingError)
+      throw createError({ statusCode: 500, statusMessage: 'The upload failed and its error could not be recorded.' })
+    }
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    console.error('Could not save generated blog', error)
-    throw createError({ statusCode: 500, statusMessage: 'The blog could not be saved.' })
+    console.error('Could not generate or save blog', error)
+    throw createError({ statusCode: 500, statusMessage: 'The blog could not be generated.' })
   }
 })

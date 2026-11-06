@@ -73,7 +73,7 @@ async function submitDataset() {
         </button>
       </form>
 
-      <p class="privacy-note">Your dataset is stored by this demo application to serve the generated article. Do not upload confidential or personal data.</p>
+      <p class="privacy-note">Your dataset is stored by this demo application to serve the generated article. Failed uploads may also be recorded with their CSV contents in a publicly accessible error log. Do not upload confidential or personal data.</p>
     </section>
   </main>
 </template>
