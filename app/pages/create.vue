@@ -59,7 +59,7 @@ async function submitDataset() {
 
         <label class="field-label file-label" for="csv-file">Company dataset CSV</label>
         <input id="csv-file" class="file-input" type="file" name="file" accept=".csv,text/csv" required @change="onFileChange">
-        <span class="file-hint">Up to 2 MB. Include a Company and Total Raised column. Region, Stage, Employees, Description, Website and Industries are optional.</span>
+        <span class="file-hint">Up to 2 MB. Include a Company and Total Raised column. Blank rows are ignored; malformed rows or missing company and fundraising values must be corrected. Region, Stage, Employees, Description, Website and Industries are optional.</span>
 
         <p class="ai-note">
           {{ generatedByAi
