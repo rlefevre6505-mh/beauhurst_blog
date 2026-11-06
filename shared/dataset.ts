@@ -106,6 +106,9 @@ export function parseCompanyCsv(csv: string): { companies: Company[], currency: 
     if (cells.length !== headers.length) {
       issues.push(`Row ${index + 2} has ${cells.length} columns; expected ${headers.length}.`)
     }
+    if (cells.some(value => /^[=+\-@]/.test(value.replace(/^[\u0000-\u0020\uFEFF]+/, '')))) {
+      issues.push(`Row ${index + 2} contains a value beginning with a spreadsheet formula character. Remove formulas and upload plain values.`)
+    }
   }
   if (issues.length) throwCsvIssues(issues)
 
