@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { BlogCopy, BlogDataset, Company } from '#shared/dataset'
 import { formatMoney, parseCompanyCsv, summarizeCompanies } from '#shared/dataset'
@@ -41,6 +41,20 @@ export async function getGeneratedBlog(slug: string): Promise<BlogDataset | null
     return JSON.parse(await readFile(join(generatedDirectory, `${slug}.json`), 'utf8')) as BlogDataset
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw error
+  }
+}
+
+export async function deleteGeneratedBlog(slug: string): Promise<void> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug === seedSlug) {
+    throw createError({ statusCode: 404, statusMessage: 'Generated blog not found.' })
+  }
+  try {
+    await unlink(join(generatedDirectory, `${slug}.json`))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw createError({ statusCode: 404, statusMessage: 'Generated blog not found.' })
+    }
     throw error
   }
 }
