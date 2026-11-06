@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const selectedFile = ref<File | null>(null)
-const industry = ref('')
+const blogTitle = ref('')
 const errorMessage = ref('')
 const isSubmitting = ref(false)
 const { data: serviceStatus } = await useFetch<{ aiConfigured: boolean }>('/api/blogs/status')
@@ -24,7 +24,7 @@ async function submitDataset() {
   errorMessage.value = ''
   const body = new FormData()
   body.append('file', selectedFile.value)
-  body.append('industry', industry.value)
+  body.append('title', blogTitle.value)
 
   try {
     const result = await $fetch<{ url: string }>('/api/blogs/upload', { method: 'POST', body })
@@ -54,8 +54,8 @@ async function submitDataset() {
       </p>
 
       <form class="upload-card" @submit.prevent="submitDataset">
-        <label class="field-label" for="industry">Industry or dataset name <span>(optional)</span></label>
-        <input id="industry" v-model="industry" name="industry" autocomplete="off" placeholder="e.g. UK healthtech" maxlength="60">
+        <label class="field-label" for="blog-title">Blog title</label>
+        <input id="blog-title" v-model="blogTitle" name="title" autocomplete="off" placeholder="e.g. UK healthtech companies leading fundraising" maxlength="120" required>
 
         <label class="field-label file-label" for="csv-file">Company dataset CSV</label>
         <input id="csv-file" class="file-input" type="file" name="file" accept=".csv,text/csv" required @change="onFileChange">
