@@ -1,6 +1,10 @@
 # Dataset-to-blog
 
-A Nuxt application that turns a company CSV into a server-rendered, SEO-ready ranking article. The included home page uses `content/fintech_companies_seed.csv`; use `/create` to upload another dataset.
+A Nuxt application that turns a company CSV into a server-rendered, SEO-ready ranking article. The included home page uses `content/fintech_companies_seed.csv`; use `/create` to upload another dataset. The application uses PapaParse to parse csv data
+
+Deployment Link: https://beauhurst-blog-green.vercel.app/
+
+Repo Link: https://github.com/rlefevre6505-mh/beauhurst_blog
 
 ## Setup
 
