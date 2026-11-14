@@ -7,11 +7,13 @@ function escapeXml(value: string): string {
 export default defineEventHandler(async (event) => {
   const siteUrl = String(useRuntimeConfig(event).public.siteUrl).replace(/\/+$/, '')
   const blogs = await listBlogs()
-  const urls = [
-    `${siteUrl}/`,
-    `${siteUrl}/blogs`,
-    ...blogs.filter(blog => blog.slug !== 'uk-fintech-fundraising').map(blog => `${siteUrl}/blog/${blog.slug}`),
+  const entries = [
+    { loc: `${siteUrl}/` },
+    { loc: `${siteUrl}/blogs` },
+    ...blogs
+      .filter(blog => blog.slug !== 'uk-fintech-fundraising')
+      .map(blog => ({ loc: `${siteUrl}/blog/${blog.slug}`, lastmod: blog.updatedAt })),
   ]
   setHeader(event, 'content-type', 'application/xml; charset=utf-8')
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(url => `  <url><loc>${escapeXml(url)}</loc></url>`).join('\n')}\n</urlset>`
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.map(entry => `  <url><loc>${escapeXml(entry.loc)}</loc>${'lastmod' in entry ? `<lastmod>${escapeXml(entry.lastmod)}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>`
 })
