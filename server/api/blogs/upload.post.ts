@@ -187,7 +187,9 @@ export default defineEventHandler(async (event) => {
       await recordUploadError(uploadedFile, [...new Set(errorMessages.length ? errorMessages : ['Unknown upload error.'])], maxUploadBytes)
     } catch (loggingError) {
       console.error('Could not record upload error', loggingError)
-      throw createError({ statusCode: 500, statusMessage: 'The upload failed and its error could not be recorded.' })
+      if (error && typeof error === 'object' && 'statusCode' in error) throw error
+      console.error('Could not generate or save blog', error)
+      throw createError({ statusCode: 500, statusMessage: 'The blog could not be generated.' })
     }
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
     console.error('Could not generate or save blog', error)

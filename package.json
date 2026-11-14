@@ -29,6 +29,7 @@
     "@tiptap/starter-kit": "^3.32.2",
     "@tiptap/suggestion": "^3.32.2",
     "@tiptap/vue-3": "^3.32.2",
+    "@vercel/blob": "^2.9.0",
     "better-sqlite3": "^13.0.3",
     "nuxt": "^4.6.3",
     "papaparse": "^5.7.0",
