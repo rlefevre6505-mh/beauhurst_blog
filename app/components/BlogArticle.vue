@@ -17,7 +17,6 @@ const structuredData = computed(() => JSON.stringify({
 
 useHead({
   script: [{ type: 'application/ld+json', innerHTML: structuredData }],
-  link: [{ rel: 'canonical', href: `${siteUrl}${route.path}` }],
 })
 </script>
 
