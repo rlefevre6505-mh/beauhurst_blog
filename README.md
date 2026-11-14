@@ -8,7 +8,7 @@ Install dependencies with `npm install`.
 
 ## Development
 
-Run `npm run dev` and open `http://localhost:3000`. To generate AI-written article copy, set `GEMINI_API_KEY` in `.env.local` or provide `NUXT_GEMINI_API_KEY` in the environment (`GEMINI-KEY` is also supported for compatibility). The default model is `gemini-3.5-flash-lite`; `NUXT_GEMINI_MODEL` can override it. The API key is used only by the server and is never returned to the browser. Without a key, the app creates concise, factual copy directly from computed dataset statistics.
+Run `npm run dev` and open `http://localhost:3000`. To generate AI-written article copy, set `GEMINI_API_KEY` in `.env.local` or provide `NUXT_GEMINI_API_KEY` in the environment (`GEMINI_KEY` is also supported for compatibility). The default model is `gemini-3.5-flash-lite`; `NUXT_GEMINI_MODEL` can override it. The API key is used only by the server and is never returned to the browser. Without a key, the app creates concise, factual copy directly from computed dataset statistics.
 
 CSV files need a `Company` (or `Name`) column and a `Total Raised` (or `Amount Raised`) column. Optional columns include `Region`, `Stage`, `Employees`, `Description`, `Website` and `Industries`. Enter a required blog title when uploading; the article uses that title, while AI generates the introduction and insights. Without an AI key, the app creates factual copy directly from computed dataset statistics. Fundraising amounts must use one currency per file; `£`, `$`, `€` and unmarked numeric amounts are supported. Uploads are limited to 2 MB and 5,000 companies.
 
