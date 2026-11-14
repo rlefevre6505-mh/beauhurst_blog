@@ -1,10 +1,7 @@
-import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import type { BlogCopy, BlogDataset, Company } from '#shared/dataset'
 import { formatMoney, parseCompanyCsv, summarizeCompanies } from '#shared/dataset'
+import { deleteStoredObject, listStoredObjects, readStoredText, writeStoredText } from './persistent-storage'
 
-const generatedDirectory = join(process.cwd(), '.data', 'blogs')
-const seedCsvPath = join(process.cwd(), 'content', 'fintech_companies_seed.csv')
 export const seedSlug = 'uk-fintech-fundraising'
 
 export async function getSeedBlog(): Promise<BlogDataset> {
@@ -37,39 +34,24 @@ export async function getSeedBlog(): Promise<BlogDataset> {
 
 export async function getGeneratedBlog(slug: string): Promise<BlogDataset | null> {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return null
-  try {
-    return JSON.parse(await readFile(join(generatedDirectory, `${slug}.json`), 'utf8')) as BlogDataset
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw error
-  }
+  const content = await readStoredText(`blogs/${slug}.json`)
+  return content === null ? null : JSON.parse(content) as BlogDataset
 }
 
 export async function deleteGeneratedBlog(slug: string): Promise<void> {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug === seedSlug) {
     throw createError({ statusCode: 404, statusMessage: 'Generated blog not found.' })
   }
-  try {
-    await unlink(join(generatedDirectory, `${slug}.json`))
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw createError({ statusCode: 404, statusMessage: 'Generated blog not found.' })
-    }
-    throw error
-  }
+  const deleted = await deleteStoredObject(`blogs/${slug}.json`)
+  if (!deleted) throw createError({ statusCode: 404, statusMessage: 'Generated blog not found.' })
 }
 
 export async function listBlogs(): Promise<Array<Pick<BlogDataset, 'slug' | 'industry' | 'copy' | 'stats' | 'updatedAt'>>> {
   const seed = await getSeedBlog()
-  let filenames: string[]
-  try {
-    filenames = await readdir(generatedDirectory)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') filenames = []
-    else throw error
-  }
-  const generated = await Promise.all(filenames.filter(name => name.endsWith('.json')).map(async (name) => {
-    return getGeneratedBlog(name.slice(0, -5))
+  const objects = await listStoredObjects('blogs/')
+  const generated = await Promise.all(objects.filter(object => object.pathname.endsWith('.json')).map(async (object) => {
+    const content = await readStoredText(object.pathname)
+    return content === null ? null : JSON.parse(content) as BlogDataset
   }))
   return [seed, ...generated.filter((blog): blog is BlogDataset => blog !== null)]
     .map(({ slug, industry, copy, stats, updatedAt }) => ({ slug, industry, copy, stats, updatedAt }))
@@ -104,11 +86,10 @@ export async function createBlogFromCsv(input: {
     copy: input.copy,
     updatedAt: new Date().toISOString(),
   }
-  await mkdir(generatedDirectory, { recursive: true })
   try {
-    await writeFile(join(generatedDirectory, `${slug}.json`), JSON.stringify(blog, null, 2), { flag: 'wx' })
+    await writeStoredText(`blogs/${slug}.json`, JSON.stringify(blog, null, 2))
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST' || await getGeneratedBlog(slug)) {
       throw createError({ statusCode: 409, statusMessage: `A blog already exists at /blog/${slug}. Rename the CSV or choose another dataset name.` })
     }
     throw error

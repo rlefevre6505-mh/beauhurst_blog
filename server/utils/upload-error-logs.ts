@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { deleteStoredObject, listStoredObjects, readStoredText, usesVercelBlob, writeStoredText } from './persistent-storage'
 
 const logPath = join(process.cwd(), '.data', 'upload-errors.jsonl')
+const blobLogPrefix = 'upload-errors/'
 const maxLogBytes = 50_000_000
 const pageSize = 20
 let writeQueue = Promise.resolve()
@@ -21,6 +23,19 @@ async function appendWithRotation(record: UploadErrorLog): Promise<void> {
   const lineBytes = Buffer.byteLength(line)
   if (lineBytes > maxLogBytes) {
     throw new Error('The upload error record exceeds the configured log capacity.')
+  }
+
+  if (usesVercelBlob()) {
+    const pathname = `${blobLogPrefix}${record.occurredAt}-${record.id}.json`
+    await writeStoredText(pathname, JSON.stringify(record))
+    const objects = (await listStoredObjects(blobLogPrefix)).sort((a, b) => a.uploadedAt.getTime() - b.uploadedAt.getTime())
+    let totalBytes = objects.reduce((total, object) => total + object.size, 0)
+    for (const object of objects) {
+      if (totalBytes <= maxLogBytes) break
+      await deleteStoredObject(object.pathname)
+      totalBytes -= object.size
+    }
+    return
   }
 
   await mkdir(join(process.cwd(), '.data'), { recursive: true })
@@ -78,6 +93,17 @@ export async function listUploadErrors(page: number): Promise<{
   pageSize: number
   total: number
 }> {
+  if (usesVercelBlob()) {
+    const objects = (await listStoredObjects(blobLogPrefix)).sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime())
+    const currentPage = Math.min(page, Math.max(1, Math.ceil(objects.length / pageSize)))
+    const selected = objects.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    const records = (await Promise.all(selected.map(async (object) => {
+      const content = await readStoredText(object.pathname)
+      return content === null ? null : JSON.parse(content) as UploadErrorLog
+    }))).filter((record): record is UploadErrorLog => record !== null)
+    return { records, page: currentPage, pageSize, total: objects.length }
+  }
+
   let content: string
   try {
     content = await readFile(logPath, 'utf8')
